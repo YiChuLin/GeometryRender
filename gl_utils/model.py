@@ -62,7 +62,7 @@ class Model():
                     if components[0] == 'v':
                         #vertex
                         vertex = [float(c) for c in components[1:]]
-                        #vertex[2] = vertex[2] - 0.1
+                        #vertex[0] = vertex[0] - 0.02
                         position.append(vertex)
                     elif components[0] == 'vn':
                         #normal

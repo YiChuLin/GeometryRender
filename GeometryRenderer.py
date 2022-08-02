@@ -12,7 +12,7 @@ import cv2
 VSHADER_PATH = "shaders/vertexShader.vs"
 FSHADER_PATH = "shaders/fragmentShader.fs"
 
-OBJ_FILE_PATH = "data/t2.obj"#00300000_normal.obj"
+OBJ_FILE_PATH = "data/coke.obj"#00300000_normal.obj"
 CAMERA_FILE_PATH = "data/cameras_sphere.npz"
 FACTOR = 4
 WINDOW_WIDTH = 2313//FACTOR
@@ -57,12 +57,23 @@ def projection_from_intrinsics(intrinsics, width, height):
     perspective[3, 3] = 0
     return perspective
 
+def projection_from_image_size(width = 2313, height = 3423, near = 0.1, far = 10):
+    projection = np.zeros((4,4))
+    projection[0,0] = 2/width
+    projection[0,2] = -1
+    projection[1,1] = -2/height
+    projection[1,2] = 1
+    projection[2,2] = (far + near)/(far - near)
+    projection[2,3] = -2*far*near/(far-near)
+    projection[3,2] = 1
+    return projection
+
 def main():
     os.makedirs('result', exist_ok=True)
     camera_dict = np.load(CAMERA_FILE_PATH)
     world_mat = camera_dict['world_mat_1']
     scale_mat = camera_dict['scale_mat_1']
-    P = world_mat#@scale_mat
+    P = world_mat@scale_mat
     P = P[:3, :4]
     intrinsics, pose = load_K_Rt_from_P(P)
     window = InitGlfwWindow(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -81,13 +92,15 @@ if __name__ == '__main__':
     #main()
     os.makedirs('result', exist_ok=True)
     camera_dict = np.load(CAMERA_FILE_PATH)
-    world_mat = camera_dict['world_mat_1']
-    scale_mat = camera_dict['scale_mat_1']
+    world_mat = camera_dict['world_mat_2']
+    scale_mat = camera_dict['scale_mat_2']
     P = world_mat#@scale_mat
     P = P[:3, :4]
     intrinsics, pose = load_K_Rt_from_P(P)
-    pose = np.linalg.inv(pose)
-    projection = projection_from_intrinsics(intrinsics, WINDOW_WIDTH, WINDOW_HEIGHT)
+    # scale intrinsics
+    #intrinsics /= FACTOR
+    #intrinsics[2,2] = 1
+    projection = projection_from_image_size()
     window = InitGlfwWindow(WINDOW_WIDTH, WINDOW_HEIGHT)
     model = Model(OBJ_FILE_PATH)
     shader = Shader(VSHADER_PATH, FSHADER_PATH)
@@ -95,9 +108,15 @@ if __name__ == '__main__':
     if True:
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glEnable(GL_DEPTH_TEST)
         shader.use()
+        # get rotation
+        R = np.linalg.inv(pose[:3,:3])
+        t = pose[:3,-1]
         shader.setMat("projection", projection.T)
-        shader.setMat("pose", pose.T)
+        shader.setMat("rotation", R.T)
+        shader.setMat("K", intrinsics[:3,:3].T)
+        shader.setVec("origin", t)
         model.Draw(shader, WINDOW_WIDTH, WINDOW_HEIGHT)
         glUseProgram(0)
         #glfw.poll_events()
@@ -107,3 +126,10 @@ if __name__ == '__main__':
     gl_frame = cv2.cvtColor(gl_frame, cv2.COLOR_BGR2RGB)
     cv2.imwrite(os.path.join('result', "test.pfm"), cv2.flip(gl_frame, 0))    
     glfw.terminate()
+
+    v = model.position[0]
+    dw = v - t
+    d = R@dw
+    d_pix = intrinsics[:3,:3]@d
+    unprojected_point = np.hstack([d_pix, 1])
+    gl_pos = projection@unprojected_point
