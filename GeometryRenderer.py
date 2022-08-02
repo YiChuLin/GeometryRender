@@ -91,21 +91,20 @@ def main():
 if __name__ == '__main__':
     #main()
     os.makedirs('result', exist_ok=True)
-    camera_dict = np.load(CAMERA_FILE_PATH)
-    world_mat = camera_dict['world_mat_2']
-    scale_mat = camera_dict['scale_mat_2']
-    P = world_mat#@scale_mat
-    P = P[:3, :4]
-    intrinsics, pose = load_K_Rt_from_P(P)
-    # scale intrinsics
-    #intrinsics /= FACTOR
-    #intrinsics[2,2] = 1
+
     projection = projection_from_image_size()
     window = InitGlfwWindow(WINDOW_WIDTH, WINDOW_HEIGHT)
     model = Model(OBJ_FILE_PATH)
     shader = Shader(VSHADER_PATH, FSHADER_PATH)
     #while not glfw.window_should_close(window):
-    if True:
+    camera_dict = np.load(CAMERA_FILE_PATH)
+    camera_num = 0
+    world_mat = camera_dict.get('world_mat_{}'.format(camera_num))
+    while world_mat is not None:
+        # scale_mat = camera_dict['scale_mat_2']
+        P = world_mat#@scale_mat
+        P = P[:3, :4]
+        intrinsics, pose = load_K_Rt_from_P(P)
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glEnable(GL_DEPTH_TEST)
@@ -119,12 +118,13 @@ if __name__ == '__main__':
         shader.setVec("origin", t)
         model.Draw(shader, WINDOW_WIDTH, WINDOW_HEIGHT)
         glUseProgram(0)
-        #glfw.poll_events()
-        #glfw.swap_buffers(window)
-    gl_frame = glReadPixels(0, 0, 2*WINDOW_WIDTH, 2*WINDOW_HEIGHT, GL_RGB, GL_FLOAT)
-    gl_frame = gl_frame.reshape(2*WINDOW_HEIGHT, 2*WINDOW_WIDTH, 3)
-    gl_frame = cv2.cvtColor(gl_frame, cv2.COLOR_BGR2RGB)
-    cv2.imwrite(os.path.join('result', "test.pfm"), cv2.flip(gl_frame, 0))    
+        gl_frame = glReadPixels(0, 0, 2*WINDOW_WIDTH, 2*WINDOW_HEIGHT, GL_RGB, GL_FLOAT)
+        gl_frame = gl_frame.reshape(2*WINDOW_HEIGHT, 2*WINDOW_WIDTH, 3)
+        gl_frame = cv2.cvtColor(gl_frame, cv2.COLOR_BGR2RGB)
+        gl_png = (gl_frame*255).astype(np.uint8)
+        cv2.imwrite(os.path.join('result', "{}_normal.png".format(camera_num)), cv2.flip(gl_png, 0))
+        camera_num += 1
+        world_mat = camera_dict.get('world_mat_{}'.format(camera_num))
     glfw.terminate()
 
     v = model.position[0]
