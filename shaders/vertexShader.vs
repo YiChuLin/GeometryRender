@@ -7,11 +7,11 @@ uniform mat3 rotation;
 uniform mat3 K;
 uniform vec3 origin;
 
-out vec3 FragPos;
+out vec3 Normal;
 out vec3 Pos;
 
 void main(){
-    FragPos = aNormal;
+    Normal = aNormal;
     Pos = aPos;
     //gl_Position = projection*view*vec4(aPos, 1.0);
     vec3 dw = aPos - origin;
